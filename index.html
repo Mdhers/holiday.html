@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificador Vacaciones 2026</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12 selection:bg-blue-100">
+
+    <!-- Sticky Header -->
+    <header class="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-200 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-blue-600 rounded-xl text-white shadow-sm shadow-blue-200">
+                    <i data-lucide="calendar"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">Planificador 2026</h1>
+                    <p class="text-sm font-medium text-slate-500">Calendario laboral - Barcelona</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                <button 
+                    id="clear-btn"
+                    onclick="clearDays()"
+                    class="hidden items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-red-600 transition-colors px-2 py-1"
+                >
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <span>Limpiar</span>
+                </button>
+                <div class="bg-slate-900 text-white px-5 py-2.5 rounded-full flex items-center gap-3 shadow-lg hover:shadow-xl transition-shadow cursor-default">
+                    <span id="counter" class="text-2xl font-black tabular-nums">0</span>
+                    <span class="text-sm font-medium leading-tight text-slate-300 border-l border-slate-700 pl-3">días<br/>tomados</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 mt-8">
+        <!-- Interactive Legend -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/60 flex flex-wrap justify-center gap-6 sm:gap-8 mb-8 text-sm font-medium text-slate-600">
+            <div class="flex items-center gap-2.5">
+                <div class="w-5 h-5 rounded-md border border-slate-200 bg-white"></div> 
+                Días laborables
+            </div>
+            <div class="flex items-center gap-2.5">
+                <div class="w-5 h-5 rounded-md bg-slate-100 border border-slate-200/50"></div> 
+                Fin de semana
+            </div>
+            <div class="flex items-center gap-2.5">
+                <div class="w-5 h-5 rounded-md bg-red-50 border border-red-200 flex items-center justify-center">
+                    <div class="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                </div> 
+                Festivo BCN
+            </div>
+            <div class="flex items-center gap-2.5">
+                <div class="w-5 h-5 rounded-md bg-blue-600 shadow-sm shadow-blue-200 ring-2 ring-blue-600 ring-offset-1"></div> 
+                Día seleccionado
+            </div>
+        </div>
+
+        <!-- 12-Month Calendar Grid -->
+        <div id="calendar-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Calendars injected by JS -->
+        </div>
+
+        <!-- Tip Section -->
+        <div class="mt-8 bg-blue-50 text-blue-800 rounded-2xl p-4 flex gap-3 items-start border border-blue-100">
+            <i data-lucide="info" class="shrink-0 mt-0.5 w-5 h-5"></i>
+            <p class="text-sm font-medium leading-relaxed">
+                <strong>Tip:</strong> Pasa el ratón (hover) sobre los días marcados en rojo para ver el nombre específico del festivo (ej: La Mercè, Segunda Pascua, etc). Haz clic en cualquier día para sumarlo a tus días totales de vacaciones tomados.
+            </p>
+        </div>
+    </main>
+
+    <script>
+        const holidays2026 = {
+            "2026-01-01": "Año Nuevo",
+            "2026-01-06": "Reyes Magos",
+            "2026-04-03": "Viernes Santo",
+            "2026-04-06": "Lunes de Pascua",
+            "2026-05-01": "Día del Trabajador",
+            "2026-05-25": "Segunda Pascua (Pascua Granada)",
+            "2026-06-24": "Sant Joan",
+            "2026-08-15": "La Asunción",
+            "2026-09-11": "La Diada",
+            "2026-09-24": "La Mercè",
+            "2026-10-12": "Fiesta Nacional de España",
+            "2026-11-01": "Todos los Santos",
+            "2026-12-06": "Día de la Constitución",
+            "2026-12-08": "Inmaculada Concepción",
+            "2026-12-25": "Navidad",
+            "2026-12-26": "Sant Esteve"
+        };
+
+        const months = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
+
+        const daysOfWeek = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+        let selectedDays = new Set();
+
+        const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+        const getFirstDayOfWeek = (year, month) => {
+            let day = new Date(year, month, 1).getDay();
+            return day === 0 ? 6 : day - 1; 
+        };
+
+        function initCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const year = 2026;
+
+            months.forEach((monthName, monthIndex) => {
+                const daysInMonth = getDaysInMonth(year, monthIndex);
+                const firstDay = getFirstDayOfWeek(year, monthIndex);
+                
+                const monthDiv = document.createElement('div');
+                monthDiv.className = "bg-white rounded-3xl p-5 shadow-sm border border-slate-200/60";
+                
+                let html = `
+                    <h2 class="text-lg font-bold text-slate-800 mb-4 ml-1 capitalize tracking-wide">${monthName}</h2>
+                    <div class="grid grid-cols-7 gap-1 text-center mb-3">
+                        ${daysOfWeek.map(d => `<div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">${d}</div>`).join('')}
+                    </div>
+                    <div class="grid grid-cols-7 gap-1.5">
+                `;
+
+                // Empty slots before 1st of the month
+                for(let i = 0; i < firstDay; i++) {
+                    html += `<div class="aspect-square"></div>`;
+                }
+
+                // Days
+                for(let d = 1; d <= daysInMonth; d++) {
+                    const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const isHoliday = !!holidays2026[dateStr];
+                    const holidayName = holidays2026[dateStr] || '';
+                    const dayOfWeek = new Date(year, monthIndex, d).getDay();
+                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                    
+                    const title = isHoliday ? holidayName : isWeekend ? 'Fin de semana' : 'Laborable';
+
+                    html += `
+                        <button
+                            data-date="${dateStr}"
+                            data-holiday="${isHoliday}"
+                            data-weekend="${isWeekend}"
+                            onclick="toggleDay('${dateStr}')"
+                            title="${title}"
+                            class="day-btn relative aspect-square w-full flex items-center justify-center rounded-xl text-sm font-semibold transition-all active:scale-90 border outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                        >
+                            ${d}
+                            ${isHoliday ? `<div class="red-dot absolute bottom-1 w-1 h-1 rounded-full bg-red-500"></div>` : ''}
+                        </button>
+                    `;
+                }
+
+                html += `</div>`;
+                monthDiv.innerHTML = html;
+                grid.appendChild(monthDiv);
+            });
+
+            updateUI();
+            lucide.createIcons();
+        }
+
+        function toggleDay(dateStr) {
+            if (selectedDays.has(dateStr)) {
+                selectedDays.delete(dateStr);
+            } else {
+                selectedDays.add(dateStr);
+            }
+            updateUI();
+        }
+
+        function clearDays() {
+            selectedDays.clear();
+            updateUI();
+        }
+
+        function updateUI() {
+            // Update counter
+            document.getElementById('counter').innerText = selectedDays.size;
+            
+            // Toggle clear button visibility
+            const clearBtn = document.getElementById('clear-btn');
+            if (selectedDays.size > 0) {
+                clearBtn.classList.remove('hidden');
+                clearBtn.classList.add('flex');
+            } else {
+                clearBtn.classList.add('hidden');
+                clearBtn.classList.remove('flex');
+            }
+
+            // Update button styles
+            document.querySelectorAll('.day-btn').forEach(btn => {
+                const dateStr = btn.dataset.date;
+                const isHoliday = btn.dataset.holiday === 'true';
+                const isWeekend = btn.dataset.weekend === 'true';
+                const isSelected = selectedDays.has(dateStr);
+                const redDot = btn.querySelector('.red-dot');
+
+                // Reset base classes
+                btn.className = "day-btn relative aspect-square w-full flex items-center justify-center rounded-xl text-sm font-semibold transition-all active:scale-90 border outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ";
+
+                if (isSelected) {
+                    btn.className += "bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-600 ring-offset-1 z-10 hover:bg-blue-700";
+                    if (redDot) redDot.style.display = 'none';
+                } else if (isHoliday) {
+                    btn.className += "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 hover:border-red-300";
+                    if (redDot) redDot.style.display = 'block';
+                } else if (isWeekend) {
+                    btn.className += "bg-slate-100 text-slate-500 border-transparent hover:bg-slate-200 hover:text-slate-700";
+                } else {
+                    btn.className += "bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50";
+                }
+            });
+        }
+
+        // Initialize the app when DOM loads
+        document.addEventListener('DOMContentLoaded', initCalendar);
+    </script>
+</body>
+</html>
