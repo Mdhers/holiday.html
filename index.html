@@ -22,7 +22,7 @@
                         <h1 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">Planificador 2026</h1>
                         <div class="flex items-center gap-2">
                             <span id="save-status" class="text-xs font-medium text-slate-400 flex items-center gap-1">
-                                <i data-lucide="cloud" class="w-3 h-3"></i> Conectando...
+                                <i data-lucide="loader" class="w-3 h-3 animate-spin"></i> Cargando...
                             </span>
                         </div>
                     </div>
@@ -266,13 +266,13 @@
                 selectedDays.add(dateStr);
             }
             updateUI();
-            saveToCloud();
+            saveData();
         }
 
         function clearDays() {
             selectedDays.clear();
             updateUI();
-            saveToCloud();
+            saveData();
         }
 
         // Event Listeners setup
@@ -288,29 +288,41 @@
         document.getElementById('location-select').addEventListener('change', (e) => {
             currentLocation = e.target.value;
             renderCalendar();
-            saveToCloud();
+            saveData();
         });
 
         let db, auth, userId, appId;
         let isFirebaseActive = false;
 
-        async function initCloudStorage() {
+        async function initStorage() {
             try {
                 const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
                 appId = typeof __app_id !== 'undefined' ? __app_id : 'local-dev-id';
                 
                 if (!configStr) {
-                    // Fallback if exported outside this environment
-                    setSaveStatus('Modo local (Sin nube)', 'cloud-off');
+                    // MODO GITHUB PAGES (Usa el LocalStorage del navegador)
+                    const localData = localStorage.getItem('planner_data');
+                    if (localData) {
+                        try {
+                            const data = JSON.parse(localData);
+                            if (data.selectedDays) selectedDays = new Set(data.selectedDays);
+                            if (data.location && holidayData[data.location]) {
+                                currentLocation = data.location;
+                                document.getElementById('location-select').value = currentLocation;
+                            }
+                        } catch(e) { console.error("Error leyendo LocalStorage", e); }
+                    }
+                    
+                    setSaveStatus('Guardado en el navegador', 'hard-drive');
                     renderCalendar();
                     return;
                 }
 
+                // MODO CANVAS (Usa Firebase de la plataforma)
                 const app = initializeApp(JSON.parse(configStr));
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
-                // Auth flow is mandatory
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
@@ -320,7 +332,6 @@
                 userId = auth.currentUser.uid;
                 isFirebaseActive = true;
                 
-                // Fetch data once, then listen for updates
                 const docRef = doc(db, 'artifacts', appId, 'users', userId, 'planner_data', 'config');
                 onSnapshot(docRef, (snapshot) => {
                     if (snapshot.exists()) {
@@ -346,39 +357,52 @@
                 });
 
             } catch (error) {
-                console.error("Cloud init failed, falling back to local.", error);
-                setSaveStatus('Error de conexión', 'cloud-alert');
+                console.error("Init failed, falling back.", error);
+                setSaveStatus('Error de conexión', 'alert-circle');
                 renderCalendar();
             }
         }
 
-        async function saveToCloud() {
-            if (!isFirebaseActive || !userId) return;
-            setSaveStatus('Guardando...', 'cloud-upload');
-            
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'planner_data', 'config');
-                await setDoc(docRef, {
-                    selectedDays: Array.from(selectedDays),
-                    location: currentLocation,
-                    lastUpdated: new Date().toISOString()
-                });
-                setSaveStatus('Guardado', 'cloud-check');
-            } catch (error) {
-                console.error("Save failed:", error);
-                setSaveStatus('Error al guardar', 'cloud-alert');
+        async function saveData() {
+            if (isFirebaseActive && userId) {
+                // Guardado en la nube (Canvas)
+                setSaveStatus('Guardando...', 'cloud-upload');
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'users', userId, 'planner_data', 'config');
+                    await setDoc(docRef, {
+                        selectedDays: Array.from(selectedDays),
+                        location: currentLocation,
+                        lastUpdated: new Date().toISOString()
+                    });
+                    setSaveStatus('Guardado', 'cloud-check');
+                } catch (error) {
+                    console.error("Save failed:", error);
+                    setSaveStatus('Error al guardar', 'alert-circle');
+                }
+            } else {
+                // Guardado Local (GitHub Pages)
+                try {
+                    localStorage.setItem('planner_data', JSON.stringify({
+                        selectedDays: Array.from(selectedDays),
+                        location: currentLocation
+                    }));
+                    setSaveStatus('Guardado en el navegador', 'hard-drive');
+                } catch (e) {
+                    console.error("LocalStorage error:", e);
+                    setSaveStatus('Error al guardar', 'alert-circle');
+                }
             }
         }
 
         function setSaveStatus(text, iconName) {
             const statusEl = document.getElementById('save-status');
             statusEl.innerHTML = `<i data-lucide="${iconName}" class="w-3 h-3"></i> ${text}`;
-            lucide.createIcons();
+            if (window.lucide) window.lucide.createIcons();
         }
 
         // Start App
         document.addEventListener('DOMContentLoaded', () => {
-            initCloudStorage();
+            initStorage();
         });
     </script>
 </body>
